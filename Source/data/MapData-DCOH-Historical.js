@@ -38,7 +38,7 @@ const timeAgo = (date, units = 2) => {
 
 const canonnEd3d_route = {
 	init: async () => {
-		const response = await fetch("https://dcoh.watch/api/v1/overwatch/systems?ngsw-bypass=true");
+		const response = await fetch("https://localhost:44440/api/v1/overwatch/systems/2022-12-29?ngsw-bypass=true");
 		if (response.status === 200) {
 			const result = await response.json();
 
@@ -51,26 +51,50 @@ const canonnEd3d_route = {
 						},
 					},
 					'States': {
-						'20': {
+						'Clear': {
+							name: 'Clear',
+							color: "333333"
+						},
+						'ClearNew': {
+							name: 'Clear (New)',
+							color: "ffffff"
+						},
+						'Alert': {
 							name: 'Alert',
+							color: "f2c540"
+						},
+						'AlertNew': {
+							name: 'Alert (New)',
 							color: "f1c232"
 						},
-						'30': {
+						'Invasion': {
 							name: 'Invasion',
-							color: "ff5200"
+							color: "993000"
 						},
-						'40': {
+						'InvasionNew': {
+							name: 'Invasion (New)',
+							color: "ff7433"
+						},
+						'Controlled': {
 							name: 'Controlled',
-							color: "38761d"
+							color: "13290a"
 						},
-						'50': {
+						'ControlledNew': {
+							name: 'Controlled (New)',
+							color: "80d75b"
+						},
+						'Maelstrom': {
 							name: 'Maelstrom',
-							color: "cc0000"
+							color: "4d0000"
 						},
-						'70': {
+						'Recovery': {
 							name: 'Recovery',
-							color: "9f1bff"
-						}
+							color: "590099"
+						},
+						'RecoveryNew': {
+							name: 'Recovery (New)',
+							color: "aa33ff"
+						},
 					},
 				},
 				systems: [],
@@ -92,28 +116,12 @@ const canonnEd3d_route = {
 			for (const data of result.systems) {
 				let infos =
 					`<b>State</b>: ${data.thargoidLevel.name}<br>` +
+					`<b>Previous state</b>: ${data.previousThargoidLevel.name}<br>` +
 					`<b>Maelstrom</b>: ${data.maelstrom.name}<br>`;
-				if (data.progress) {
-					infos += `<b>Progress</b>: ${data.progress} %<br>`;
-				}
-				if (data.thargoidLevel.level === 30) {
-					infos +=
-						`<b>Stations Under Attack</b>: ${data.stationsUnderAttack}<br>` +
-						`<b>Stations Damaged</b>: ${data.stationsDamaged}<br>`;
-
-				}
-				else if (data.thargoidLevel.level === 70) {
-					infos += `<b>Stations Under Repair</b>: ${data.stationsUnderRepair}<br>`;
-				}
-
-				if (data.stateExpiration?.stateExpires) {
-					infos += `<b>Time remaining</b>: ${timeAgo(data.stateExpiration.stateExpires)}<br>`;
-				}
-
 				const poiSite = {
 					name: data.name,
 					infos: infos,
-					cat: [data.thargoidLevel.level.toString()],
+					cat: [data.state],
 					coords: data.coordinates,
 				}
 				systemsData.systems.push(poiSite);
