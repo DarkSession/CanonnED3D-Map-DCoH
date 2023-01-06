@@ -38,7 +38,10 @@ const timeAgo = (date, units = 2) => {
 
 const canonnEd3d_route = {
 	init: async () => {
-		const response = await fetch("https://localhost:44440/api/v1/overwatch/systems/2022-12-29?ngsw-bypass=true");
+		const urlParams = new URLSearchParams(window.location.search);
+		const date = urlParams.get("date") || "2000-01-01";
+
+		const response = await fetch(`https://dcoh.watch/api/v1/overwatch/systems/${date}?ngsw-bypass=true`);
 		if (response.status === 200) {
 			const result = await response.json();
 
@@ -58,10 +61,6 @@ const canonnEd3d_route = {
 						'ClearNew': {
 							name: 'Clear (New)',
 							color: "ffffff"
-						},
-						'Alert': {
-							name: 'Alert',
-							color: "f2c540"
 						},
 						'AlertNew': {
 							name: 'Alert (New)',
