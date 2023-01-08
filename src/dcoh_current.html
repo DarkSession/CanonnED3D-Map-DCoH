@@ -1,0 +1,52 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="img/favicon.ico" />
+
+  <link href="https://fonts.googleapis.com/css?family=Orbitron:400" rel="stylesheet" type="text/css" />
+  <link rel="stylesheet" href="css/font-awesome.min.css">
+  <link rel="stylesheet" type="text/css" href="css/menu.css" />
+  <link rel="stylesheet" type="text/css" href="css/style.css" />
+  <link rel="stylesheet" type="text/css" type="text/css" />
+  <script src="bundle.js"></script>
+
+  <!-- Custom CSS -->
+  <style type="text/css">
+    #systemDetails,
+    #hud {
+      width: 350px;
+    }
+
+    #edmap {
+      position: fixed;
+      top: 0%;
+      right: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+  </style>
+
+  <title>CanonnED3D - Maps</title>
+</head>
+
+<body>
+  <div id="edmap">
+    <div id="loading">
+      <img src="img/Canonn-Logo.gif" alt="Loading" height="300" width="300" />
+    </div>
+    <!-- Canonn MapData-output.js -->
+    <script src="data/MapData-DCOH.js"></script>
+    <script type="text/javascript">
+      setTimeout(() => {
+        canonnEd3d_route.init();
+      }, 2000);
+    </script>
+  </div>
+</body>
+
+</html>

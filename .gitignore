@@ -19,3 +19,8 @@ Source/us2/
 *.sln
 
 Web.config
+
+node_modules
+node_modulesx
+dist
+
