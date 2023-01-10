@@ -1526,12 +1526,48 @@ const ammoniaWorlds = [
 ];
 
 const canonnEd3d_route = {
+	finishMap: () => {
+		$('#search').css('display', 'block');
+		$('#search input').val('System').on('input', canonnEd3d_route.search);
+	},
+	search: () => {
+		const term = $('#search input').val().trim().toUpperCase();
+		if (!term) {
+			return;
+		}
+
+		let foundSystem = null;
+		for (const system of canonnEd3d_route.systemsData.systems) {
+			if (system.name.toUpperCase() === term) {
+				foundSystem = system;
+				break;
+			}
+		}
+		if (foundSystem) {
+			canonnEd3d_route.recenterViewport(foundSystem.coords, 10);
+			$('#search input:focus-visible').css("outline-color", "darkgreen")
+		} else {
+			$('#search input:focus-visible').css("outline-color", "red")
+		}
+	},
+	recenterViewport: (center, distance) => {
+		//-- Set new camera & target position
+		Ed3d.playerPos = [center.x, center.y, center.z];
+		Ed3d.cameraPos = [
+			center.x + distance,
+			center.y + distance,
+			center.z - distance
+		];
+
+		Action.moveInitalPosition();
+	},
+	systemsData: {},
 	init: async () => {
 		const response = await fetch("https://dcoh.watch/api/v1/overwatch/systems?ngsw-bypass=true");
 		if (response.status === 200) {
 			const result = await response.json();
 
-			const systemsData = {
+			canonnEd3d_route.systemsData = {
 				categories: {
 					'Systems': {
 						'00': {
@@ -1576,6 +1612,8 @@ const canonnEd3d_route = {
 					z: 0,
 				}
 			};
+
+			const systemsData = canonnEd3d_route.systemsData;
 			systemsData.systems.push(solSite);
 
 			for (const data of result.systems) {
@@ -1611,7 +1649,7 @@ const canonnEd3d_route = {
 			if (urlParams.get("ammonia")) {
 				systemsData.categories["Systems"]["Ammonia"] = {
 					name: 'Ammonia world',
-					color: "99ccff",
+					color: "4e290a",
 				};
 				systemsData.systems.push(...ammoniaWorlds);
 			}
@@ -1631,6 +1669,7 @@ const canonnEd3d_route = {
 				cameraPos: [camerapos.x - 400, camerapos.y, camerapos.z - 400],
 				playerPos: [camerapos.x, camerapos.y, camerapos.z],
 				systemColor: '#FF9D00',
+				finished: canonnEd3d_route.finishMap,
 			});
 		}
 	},
