@@ -28,6 +28,7 @@
     "@types/three": "^0.148.0",
     "axios": "^1.2.2",
     "jquery": "^3.6.3",
+    "strict-event-emitter": "^0.4.3",
     "three": "^0.148.0"
   }
 }

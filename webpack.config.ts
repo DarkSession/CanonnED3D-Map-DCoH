@@ -35,8 +35,8 @@ const config: webpack.Configuration = {
     ],
   },
   performance: {
-    maxAssetSize: 5000000,
-    maxEntrypointSize: 3000000,
+    maxAssetSize: 9000000,
+    maxEntrypointSize: 7000000,
   },
   resolve: {
     extensions: ['.tsx', '.ts', '.js'],
@@ -44,17 +44,18 @@ const config: webpack.Configuration = {
   output: {
     filename: 'bundle.js',
     path: path.resolve(__dirname, 'dist'),
+    libraryTarget: "var",
+    library: "ED3DMap",
     clean: true,
   },
   plugins: [
     new CopyPlugin({
       patterns: [
-        { from: "css", to: "css" },
         { from: "data", to: "data" },
-        { from: "img", to: "img" },
-        { from: "include", to: "include" },
+        { from: "fonts", to: "fonts" },
         { from: "textures", to: "textures" },
         { from: "*.html" },
+        { from: "*.css" },
       ],
     }),
   ],
