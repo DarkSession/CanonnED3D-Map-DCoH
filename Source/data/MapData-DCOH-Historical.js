@@ -136,7 +136,7 @@ const canonnEd3d_route = {
 				withHudPanel: true,
 				hudMultipleSelect: true,
 				effectScaleSystem: [20, 500],
-				startAnim: true,
+				startAnim: false,
 				showGalaxyInfos: true,
 				cameraPos: [camerapos.x - 400, camerapos.y, camerapos.z - 400],
 				playerPos: [camerapos.x, camerapos.y, camerapos.z],
