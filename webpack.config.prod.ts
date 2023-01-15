@@ -8,10 +8,6 @@ const config: webpack.Configuration = {
   mode: 'production',
   context: path.resolve(__dirname, 'src'),
   entry: './index.ts',
-  devtool: 'inline-source-map',
-  devServer: {
-    static: './dist',
-  },
   module: {
     rules: [
       {
@@ -19,19 +15,6 @@ const config: webpack.Configuration = {
         use: 'ts-loader',
         exclude: /node_modules/,
       },
-      /*
-      {
-        // Exposes jQuery for use outside Webpack build
-        test: require.resolve('jquery'),
-        use: [{
-          loader: 'expose-loader',
-          options: 'jQuery'
-        }, {
-          loader: 'expose-loader',
-          options: '$'
-        }]
-      }
-      */
     ],
   },
   performance: {
