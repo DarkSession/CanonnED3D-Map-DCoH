@@ -1,10 +1,27 @@
+body {
+	font-family: 'Oxygen Mono', Tahoma, Arial, sans-serif, Helvetica, Sans-serif;
+	background-color: #fff;
+	color: #444;
+	margin: 0;
+}
+
 a {
-	color: #ff0;
-	text-decoration: none;
+	color: rgb(252, 134, 0);
 }
 
 a:hover {
-	text-decoration: underline;
+	color: #00b3f7;
+}
+
+header,
+h1,
+h2,
+th,
+.item-gal strong,
+.cat-box .lbl,
+.mini-title,
+.def>span {
+	font-family: "Oswald", Verdana;
 }
 
 button {
@@ -132,4 +149,70 @@ select {
 	width: auto;
 	padding-left: 10px;
 	padding-right: 10px;
+}
+
+.map_filter,
+.map_link {
+	display: block;
+	margin: 0 0 3px;
+	cursor: pointer;
+}
+
+.map_filter:hover,
+.map_link:hover {
+	color: #FF7207;
+}
+
+.check.disabled {
+	background-color: #333 !important;
+}
+
+.map_filter.hidden {
+	display: none;
+}
+
+.map_filter.hidden {
+	display: inline-block;
+}
+
+.check {
+	width: 14px;
+	height: 14px;
+	line-height: 1;
+	float: right;
+	text-align: center;
+}
+
+.check:after {
+	content: ' ';
+	display: block;
+	width: 10px;
+	height: 10px;
+	margin: 2px;
+	background: rgba(0, 0, 0, 0.5);
+}
+
+.nav {
+	position: absolute;
+	bottom: 10px;
+	right: 0;
+	width: 100%;
+	text-align: center;
+}
+
+.nav>a {
+	cursor: pointer;
+	display: inline-block;
+	width: 22%;
+	margin: 2%;
+	padding: 10px;
+	border: solid 1px #222;
+	background: rgb(10, 10, 10);
+	background: rgba(10, 10, 10, 0.8);
+	box-shadow: 1px 1px 3px #000;
+	font-weight: bold;
+	font-size: 1rem;
+	text-align: center;
+	box-sizing: border-box;
+	text-decoration: none;
 }

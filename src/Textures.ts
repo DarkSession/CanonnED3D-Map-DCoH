@@ -1,6 +1,6 @@
 
 import * as THREE from 'three';
-import { Material, MeshBasicMaterial, SpriteMaterial, Texture } from 'three';
+import { Material, MeshBasicMaterial, MeshPhongMaterial, SpriteMaterial, Texture } from 'three';
 import { ED3DMap } from './ED3DMap';
 
 export class Textures {
@@ -10,11 +10,12 @@ export class Textures {
 
     public glow1!: SpriteMaterial;
     public glow2!: SpriteMaterial;
+    public systemSpriteDisabled!: SpriteMaterial;
     public white: MeshBasicMaterial;
-    public gray: THREE.MeshPhongMaterial;
-    public black: THREE.MeshBasicMaterial;
-    public darkBlue: THREE.MeshBasicMaterial;
-    public selected: THREE.MeshPhongMaterial;
+    public gray: MeshPhongMaterial;
+    public black: MeshBasicMaterial;
+    public darkBlue: MeshBasicMaterial;
+    public selected: MeshPhongMaterial;
 
     private materialDisposeList: Material[] = [];
 
@@ -50,6 +51,7 @@ export class Textures {
         this.flareYellow.dispose();
         this.glow1.dispose();
         this.glow2.dispose();
+        this.systemSpriteDisabled.dispose();
         this.white.dispose();
         this.gray.dispose();
         this.black.dispose();
@@ -95,6 +97,13 @@ export class Textures {
             blending: THREE.AdditiveBlending,
             depthWrite: true,
             opacity: 0.5,
+        });
+        this.systemSpriteDisabled = new THREE.SpriteMaterial({
+            map: this.flareYellow,
+            transparent: true,
+            fog: false,
+            blending: THREE.AdditiveBlending,
+            opacity: 0.1,
         });
         console.log("Textures loaded.");
     }

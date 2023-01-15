@@ -17,7 +17,7 @@ export class GalaxySystem {
             selection.rotation.x = Math.PI / 2;
             this.cursorHover.add(selection);
 
-            this.ED3DMap.scene.add(this.cursorHover);
+            this.ED3DMap.addToScene(this.cursorHover);
         }
         {
             this.cursorSelection = new THREE.Object3D();
@@ -45,16 +45,18 @@ export class GalaxySystem {
             coneInner.rotation.x = Math.PI;
             this.cursorSelection.add(coneInner);
 
-            this.ED3DMap.scene.add(this.cursorSelection);
+            this.ED3DMap.addToScene(this.cursorSelection);
         }
 
         this.ED3DMap.events.on("enableFarView", eventData => {
             this.cursorScale = 40;
             this.cursorHover.scale.set(this.cursorScale, this.cursorScale, this.cursorScale);
+            this.cursorSelection.scale.set(this.cursorScale, this.cursorScale, this.cursorScale);
         });
         this.ED3DMap.events.on("disableFarView", eventData => {
             this.cursorScale = 1;
             this.cursorHover.scale.set(this.cursorScale, this.cursorScale, this.cursorScale);
+            this.cursorSelection.scale.set(this.cursorScale, this.cursorScale, this.cursorScale);
         });
         this.ED3DMap.events.on("systemHoverChanged", (system: System | null) => {
             this.systemHoverChanged(system);

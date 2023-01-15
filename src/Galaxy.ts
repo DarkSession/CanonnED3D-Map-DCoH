@@ -98,7 +98,7 @@ export class Galaxy {
     this.milkyway2D.visible = this.ED3DMap.isFarViewEnabled;
     // milkyway2D.showCoord = true;
 
-    this.ED3DMap.scene.add(this.milkyway2D);
+    this.ED3DMap.addToScene(this.milkyway2D);
   }
 
   private createParticles() {
@@ -246,7 +246,7 @@ export class Galaxy {
       }
     }
 
-    this.ED3DMap.scene.add(this.infos);
+    this.ED3DMap.addToScene(this.infos);
   }
 
   public addText(text: string, x: number, y: number, z: number, rotation: number, size = 450, revert = false) {
@@ -266,7 +266,7 @@ export class Galaxy {
     this.ED3DMap.textures.disposeMaterialWhenDestroyed(galaxyInfoTextMaterial);
 
     const textMesh = new GalaxyMapTextMesh(geometry, galaxyInfoTextMaterial);
-    this.ED3DMap.scene.add(textMesh);
+    this.ED3DMap.addToScene(textMesh);
 
     // x -= Math.round(textShow.length*400/2);
     const middleTxt = Math.round(size / 2);

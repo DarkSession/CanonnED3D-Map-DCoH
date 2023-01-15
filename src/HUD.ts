@@ -14,6 +14,7 @@ export class HUD {
     private filterContainerElement: HTMLDivElement | null = null;
     private searchContainerElement: HTMLDivElement | null = null;
     private searchInputElement: HTMLInputElement | null = null;
+    private navigationContainerElement: HTMLDivElement | null = null;
 
     public constructor(
         private readonly ED3DMap: ED3DMap) {
@@ -23,6 +24,7 @@ export class HUD {
             this.ED3DMap.appendToContainer(controlsContainer);
             controlsContainer.classList.add("controls");
 
+            /*
             {
                 const link1 = document.createElement("a");
                 controlsContainer.append(link1);
@@ -40,6 +42,7 @@ export class HUD {
                     console.log("link2");
                 };
             }
+            */
             {
                 const link3 = document.createElement("a");
                 controlsContainer.append(link3);
@@ -81,6 +84,14 @@ export class HUD {
             this.hudElement = document.createElement("div");
             this.ED3DMap.appendToContainer(this.hudElement);
             this.hudElement.classList.add("hud");
+
+            this.hudElement.onpointerenter = () => {
+                this.ED3DMap.disableControls();
+            };
+
+            this.hudElement.onpointerleave = () => {
+                this.ED3DMap.enableControls();
+            };
 
             this.titleElement = document.createElement("h2");
             this.hudElement.append(this.titleElement);
@@ -130,6 +141,20 @@ export class HUD {
             this.filterContainerElement = document.createElement("div");
             this.hudElement.append(this.filterContainerElement);
 
+            this.navigationContainerElement = document.createElement("div");
+            this.hudElement.append(this.navigationContainerElement);
+            this.navigationContainerElement.classList.add("nav");
+
+            {
+                const closeBtn = document.createElement("a");
+                this.navigationContainerElement.append(closeBtn);
+                closeBtn.innerText = "X";
+
+                closeBtn.onclick = async () => {
+                    await this.ED3DMap.events.emit("systemSelectionChanged", null);
+                };
+            }
+
             this.systemSelectionChanged(null);
         }
 
@@ -152,7 +177,9 @@ export class HUD {
         const textGeo = new THREE.ShapeGeometry(textShapes);
         this.hoverText = new THREE.Mesh(textGeo, this.ED3DMap.textures.white);
         this.hoverText.visible = false;
-        this.ED3DMap.scene.add(this.hoverText);
+        this.ED3DMap.addToScene(this.hoverText);
+
+        this.createFilterList();
     }
 
     private render(): void {
@@ -170,7 +197,6 @@ export class HUD {
             this.hoverText.geometry = textGeo;
             this.hoverText.position.set(system.x, system.y + 4, system.z);
             this.hoverText.rotation.y = -Math.PI / 2;
-            // this.hoverText.name = id;
             this.hoverText.lookAt(this.ED3DMap.camera.position);
         }
         else {
@@ -193,7 +219,10 @@ export class HUD {
                     this.systemCoordsZElement.innerText = this.activeSystem.z.toString();
                 }
                 if (this.searchContainerElement) {
-                    this.searchContainerElement.style.display = "none";
+                    this.searchContainerElement.hidden = true;
+                }
+                if (this.filterContainerElement) {
+                    this.filterContainerElement.hidden = true;
                 }
                 if (this.systemInformationElement) {
                     if (this.activeSystem.configuration.description) {
@@ -203,11 +232,65 @@ export class HUD {
                         this.systemInformationElement.innerText = "";
                     }
                 }
+                if (this.navigationContainerElement) {
+                    this.navigationContainerElement.hidden = false;
+                }
             }
             else {
                 this.titleElement.innerText = "Infos";
                 if (this.searchContainerElement && this.ED3DMap.config.showSystemSearch) {
-                    this.searchContainerElement.style.display = "block";
+                    this.searchContainerElement.hidden = false;
+                }
+                if (this.filterContainerElement) {
+                    this.filterContainerElement.hidden = false;
+                }
+                if (this.navigationContainerElement) {
+                    this.navigationContainerElement.hidden = true;
+                }
+            }
+        }
+    }
+
+    private createFilterList(): void {
+        if (this.filterContainerElement) {
+            while (this.filterContainerElement.hasChildNodes()) {
+                this.filterContainerElement.removeChild(this.filterContainerElement.firstChild!);
+            }
+            for (const categoryName of Object.keys(this.ED3DMap.config.categories)) {
+                const titleElement = document.createElement("h2");
+                this.filterContainerElement.append(titleElement);
+                titleElement.innerText = categoryName;
+                for (const category of Object.keys(this.ED3DMap.config.categories[categoryName])) {
+                    const categoryConfiguration = this.ED3DMap.config.categories[categoryName][category];
+
+                    const filter = document.createElement("a");
+                    this.filterContainerElement.append(filter);
+                    filter.classList.add("map_filter");
+
+                    if (this.ED3DMap.systemCategories[category]) {
+                        filter.onclick = async () => {
+                            if (this.ED3DMap.systemCategories[category]) {
+                                this.ED3DMap.systemCategories[category].active = !this.ED3DMap.systemCategories[category].active;
+                                if (this.ED3DMap.systemCategories[category].active) {
+                                    filterCheck.classList.remove("disabled");
+                                }
+                                else {
+                                    filterCheck.classList.add("disabled");
+                                }
+                                await this.ED3DMap.events.emit("toggleCategoryFilter", category);
+                            }
+                        };
+                    }
+
+                    const filterCheck = document.createElement("span");
+                    filter.append(filterCheck);
+                    filterCheck.classList.add("check");
+                    filterCheck.style.backgroundColor = "#" + categoryConfiguration.color;
+
+                    filter.append(document.createTextNode(categoryConfiguration.name));
+
+                    const systemsCount = this.ED3DMap.config.systems.filter(s => s.categories?.includes(category ?? false)).length;
+                    filter.append(document.createTextNode(` (${systemsCount})`));
                 }
             }
         }

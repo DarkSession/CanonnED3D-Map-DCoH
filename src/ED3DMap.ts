@@ -40,13 +40,15 @@ interface Events {
     systemHoverChanged: System | null;
     //
     systemSelectionChanged: System | null;
+    //
+    toggleCategoryFilter: string;
 }
 
 export class ED3DMap {
     private tweens: Tween<any>[] = [];
     public camera: PerspectiveCamera;
     private starField: THREE.Points;
-    public scene: Scene;
+    private scene: Scene;
     private renderer: WebGLRenderer;
     private plane: Mesh;
     private light: HemisphereLight;
@@ -57,9 +59,6 @@ export class ED3DMap {
     private grid1XL: GridHelper;
     private coordinatesGridText: THREE.Mesh | null = null;
     private coordinatesText: string | null = null;
-    private galaxy: Galaxy;
-    private action: Action;
-    private hud: HUD;
     public events = new Emittery<Events>();
     public font: Font | null = null;
     public textures: Textures;
@@ -67,10 +66,11 @@ export class ED3DMap {
     private farView: boolean = false;
     private fogDensity: number = 0;
     private previousScale = -1;
-    private systemCategories: {
+    public systemCategories: {
         [key: string]: {
             color: string;
             spriteMaterial?: THREE.SpriteMaterial;
+            active: boolean;
         }
     } = {};
     private stats: Stats;
@@ -85,20 +85,17 @@ export class ED3DMap {
                 const categoryConfiguration = this.config.categories[categoryName][category];
                 this.systemCategories[category] = {
                     color: categoryConfiguration.color,
+                    active: true,
                 };
             }
         }
 
         this.camera = new THREE.PerspectiveCamera(45, this.container.offsetWidth / this.container.offsetHeight, 1, 200000);
         if (this.config.startAnimation) {
-            this.setCameraPosition(-10000, 40000, 50000);
-            //this.Ed3d.Action.moveInitalPosition(4000);
+            this.camera.position.set(-10000, 40000, 50000);
         } else {
-            this.setCameraPosition(500, 800, 1300);
-            // this.Ed3d.Action.moveInitalPositionNoAnim();
+            this.camera.position.set(500, 800, 1300);
         }
-
-        this.camera.lookAt(0, 0, 0);
 
         this.scene = new THREE.Scene();
         this.scene.add(this.camera);
@@ -192,9 +189,9 @@ export class ED3DMap {
         this.renderer.setClearColor(this.scene.fog.color, 1);
         this.fogDensity = (this.scene.fog as THREE.FogExp2).density;
 
-        this.galaxy = new Galaxy(this);
-        this.action = new Action(this);
-        this.hud = new HUD(this);
+        new Galaxy(this);
+        new Action(this);
+        new HUD(this);
         new GalaxySystem(this);
 
         this.events.on("loadAssetsCache", async () => {
@@ -203,6 +200,14 @@ export class ED3DMap {
         });
         this.events.on("scaleChanged", async (scale: number) => {
             await this.scaleChanged(scale);
+        });
+        this.events.on("systemSelectionChanged", (system: System | null) => {
+            if (system) {
+                this.setCameraPositionToSystem(system);
+            }
+        });
+        this.events.on("toggleCategoryFilter", async (categoryName: string) => {
+            await this.toggleCategoryFilter(categoryName);
         });
     }
 
@@ -258,7 +263,7 @@ export class ED3DMap {
                 const geometry = new THREE.BufferGeometry();
                 geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
 
-                const particle = new SystemPoint(system, geometry, particleMaterial);
+                const particle = new SystemPoint(system, sprite, geometry, particleMaterial);
                 particle.position.set(system.x, system.y, system.z);
                 this.scene.add(particle);
 
@@ -277,8 +282,26 @@ export class ED3DMap {
             this.onWindowResize();
         });
 
+        this.setCameraPosition(0, -150, 0, 500, this.config.startAnimation);
+
+        this.camera.lookAt(0, 0, 0);
+
         this.render();
         await this.events.emit("ready");
+    }
+
+    private async toggleCategoryFilter(categoryName: string): Promise<void> {
+        const active = this.systemCategories[categoryName].active;
+        const material = active ? this.systemCategories[categoryName].spriteMaterial : this.textures.systemSpriteDisabled;
+        if (!material) {
+            return;
+        }
+        for (const object3d of this.scene.children) {
+            if (object3d instanceof SystemPoint && object3d.system.configuration.categories?.includes(categoryName)) {
+                object3d.sprite.material = material;
+            }
+        }
+        this.requestRender();
     }
 
     public requestRender(): void {
@@ -407,52 +430,65 @@ export class ED3DMap {
         }
     }
 
-    public setCameraPosition(x: number, y: number, z: number): void {
-        this.camera.position.set(x, y, z);
+    public addToScene(...object: Object3D[]): void {
+        this.scene.add(...object);
     }
 
-    public setCameraPositionToSystem(system: System) {
-        this.controls.enabled = false;
-
-        // this.Ed3d.HUD.setInfoPanel(index, obj);
-        // if (obj.infos != undefined) this.Ed3d.HUD.openHudDetails();
-
-        const goX = system.x;
-        const goY = system.y;
-        const goZ = system.z;
-
-        //-- If in far view reset to classic view
+    public setCameraPosition(x: number, y: number, z: number, distance: number, withAnimation: boolean = true): void {
+        this.disableControls();
+        // If in far view reset to classic view
         this.disableFarView(25, false);
-
-        //-- Move grid to object
-        // this.moveGridTo(goX, goY, goZ);
-
-        //-- Move camera to target (Smooth move using Tween)
-        const moveFrom = {
-            x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z,
-            mx: this.controls.target.x, my: this.controls.target.y, mz: this.controls.target.z
-        };
-        const moveCoords = {
-            x: goX, y: goY + 15, z: goZ + 15,
-            mx: goX, my: goY, mz: goZ
+        const moveTo = {
+            x: x, y: y + distance, z: z + distance,
+            mx: x, my: y, mz: z
         };
 
-        this.getTweenInstance(moveFrom)
-            .to(moveCoords, 800)
-            .start()
-            .onUpdate(() => {
-                this.camera.position.set(moveFrom.x, moveFrom.y, moveFrom.z);
-                this.controls.target.set(moveFrom.mx, moveFrom.my, moveFrom.mz);
-            })
-            .onComplete(() => {
-                this.controls.update();
-            });
+        if (withAnimation) {
+            // this.Ed3d.HUD.setInfoPanel(index, obj);
+            // if (obj.infos != undefined) this.Ed3d.HUD.openHudDetails();
 
-        //-- 3D Cursor on selected object
+            // Move camera to target (Smooth move using Tween)
+            const moveFrom = {
+                x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z,
+                mx: this.controls.target.x, my: this.controls.target.y, mz: this.controls.target.z
+            };
 
-        // this.addCursorOnSelect(goX, goY, goZ);
+            this.getTweenInstance(moveFrom)
+                .to(moveTo, 1200)
+                .start()
+                .onUpdate(() => {
+                    this.camera.position.set(moveFrom.x, moveFrom.y, moveFrom.z);
+                    this.controls.target.set(moveFrom.mx, moveFrom.my, moveFrom.mz);
+                })
+                .onComplete(() => {
+                    this.controls.update();
+                });
+
+            // 3D Cursor on selected object
+
+            // this.addCursorOnSelect(goX, goY, goZ);
+        }
+        else {
+            this.camera.position.set(moveTo.x, moveTo.y, moveTo.z);
+            this.controls.target.set(moveTo.mx, moveTo.my, moveTo.mz);
+        }
+        this.enableControls();
+    }
+
+    public setCameraPositionToSystem(system: System, withAnimation: boolean = true) {
+        this.setCameraPosition(system.x, system.y, system.z, 50, withAnimation);
+    }
+
+    public enableControls(): void {
         this.controls.enabled = true;
-        return true;
+    }
+
+    public disableControls(): void {
+        this.controls.enabled = false;
+    }
+
+    public get controlsEnabled(): boolean {
+        return this.controls.enabled;
     }
 
     public raycasterIntersectObjects(coords: { x: number; y: number }): Intersection<Object3D<THREE.Event>>[] {
@@ -545,6 +581,7 @@ export class SystemPoint<
 > extends THREE.Points {
     public constructor(
         public readonly system: System,
+        public sprite: THREE.Sprite,
         geometry?: TGeometry,
         material?: TMaterial) {
         super(geometry, material);
