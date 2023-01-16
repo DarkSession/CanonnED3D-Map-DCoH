@@ -1,17 +1,16 @@
-import * as THREE from 'three';
-import { Material, Object3D, PointsMaterial } from 'three';
-import { ED3DMap, RenderData } from './ED3DMap';
+import { AdditiveBlending, BufferGeometry, DoubleSide, Float32BufferAttribute, Material, Matrix4, Mesh, MeshBasicMaterial, Object3D, PlaneGeometry, Points, PointsMaterial, ShapeGeometry, Sprite, Vector3 } from 'three';
+import { ED3DMap } from './ED3DMap';
 import { System } from './System';
 
 export class Galaxy {
   private x = 25;
   private y = -21;
   private z = 25900;
-  private infos: Object3D | null = null;
+  private galaxyInfos: Object3D | null = null;
   private galaxyCenter: System | null = null;
-  private particlePointsSmall: THREE.Points | null = null;
-  private particlePointsLarge: THREE.Points | null = null;
-  private milkyway2D: THREE.Mesh | null = null;
+  private particlePointsSmall: Points | null = null;
+  private particlePointsLarge: Points | null = null;
+  private milkyway2D: Mesh | null = null;
 
   public constructor(
     private readonly ED3DMap: ED3DMap
@@ -28,10 +27,13 @@ export class Galaxy {
     this.ED3DMap.events.on("scaleChanged", (scale: number) => {
       this.scaleChanged(scale);
     });
+    this.ED3DMap.events.on("configChanged", async () => {
+      await this.addOrShowGalaxyInformation();
+    });
   }
 
   private scaleChanged(scale: number): void {
-    if (this.ED3DMap.config.showGalaxyInfos && this.infos !== null) {
+    if (this.ED3DMap.config.showGalaxyInfos && this.galaxyInfos !== null) {
       const scaleInternal = scale - 70;
       let opacity = Math.round(scaleInternal / 10) / 10;
       if (opacity < 0) {
@@ -46,7 +48,7 @@ export class Galaxy {
         opacityMiddle = 0.2;
       }
 
-      for (const txt of this.infos.children) {
+      for (const txt of this.galaxyInfos.children) {
         if (txt instanceof GalaxyMapTextMesh) {
           this.materialChangeOpacity(txt.material, (!txt.revert) ? opacity : opacityMiddle);
         }
@@ -71,8 +73,9 @@ export class Galaxy {
       coordinates: { x: this.y, y: this.y, z: this.z },
       categories: [],
     });
+    this.galaxyCenter.permanent = true;
 
-    const sprite = new THREE.Sprite(this.ED3DMap.textures.glow2);
+    const sprite = new Sprite(this.ED3DMap.textures.glow2);
     sprite.scale.set(50, 40, 2.0);
     this.galaxyCenter.add(sprite); /// this centers the glow at the mesh
 
@@ -82,17 +85,17 @@ export class Galaxy {
   }
 
   private add2DPlane() {
-    const heightMapMaterial = new THREE.MeshBasicMaterial({
+    const heightMapMaterial = new MeshBasicMaterial({
       map: this.ED3DMap.textures.heightmap,
       transparent: true,
       opacity: 0.4,
-      blending: THREE.AdditiveBlending,
+      blending: AdditiveBlending,
       depthWrite: false,
-      side: THREE.DoubleSide,
+      side: DoubleSide,
     });
     this.ED3DMap.textures.disposeMaterialWhenDestroyed(heightMapMaterial);
-    const floorGeometry = new THREE.PlaneGeometry(104000, 104000, 1, 1);
-    this.milkyway2D = new THREE.Mesh(floorGeometry, heightMapMaterial);
+    const floorGeometry = new PlaneGeometry(104000, 104000, 1, 1);
+    this.milkyway2D = new Mesh(floorGeometry, heightMapMaterial);
     this.milkyway2D.position.set(this.x, this.y, -this.z);
     this.milkyway2D.rotation.x = -Math.PI / 2;
     this.milkyway2D.visible = this.ED3DMap.isFarViewEnabled;
@@ -170,42 +173,42 @@ export class Galaxy {
     canvas.remove();
     {
       // Create small particles milkyway
-      const particlesSmall = new THREE.BufferGeometry();
-      particlesSmall.setAttribute('position', new THREE.Float32BufferAttribute(particleSmallVertices, 3));
-      particlesSmall.setAttribute('color', new THREE.Float32BufferAttribute(colorsSmall, 3));
+      const particlesSmall = new BufferGeometry();
+      particlesSmall.setAttribute('position', new Float32BufferAttribute(particleSmallVertices, 3));
+      particlesSmall.setAttribute('color', new Float32BufferAttribute(colorsSmall, 3));
 
-      const systemPointSmallMaterial = new THREE.PointsMaterial({
+      const systemPointSmallMaterial = new PointsMaterial({
         map: this.ED3DMap.textures.flareYellow,
         transparent: true,
         size: 16,
-        blending: THREE.AdditiveBlending,
+        blending: AdditiveBlending,
         depthTest: true,
         depthWrite: false,
       });
       this.ED3DMap.textures.disposeMaterialWhenDestroyed(systemPointSmallMaterial);
 
-      this.particlePointsSmall = new THREE.Points(particlesSmall, systemPointSmallMaterial);
+      this.particlePointsSmall = new Points(particlesSmall, systemPointSmallMaterial);
       particlesSmall.center();
       this.particlePointsSmall.scale.set(20, 20, 20);
       this.galaxyCenter?.add(this.particlePointsSmall);
     }
     {
       // Create big particles milkyway
-      const particlesLarge = new THREE.BufferGeometry();
-      particlesLarge.setAttribute('position', new THREE.Float32BufferAttribute(particleLargeVertices, 3));
-      particlesLarge.setAttribute('color', new THREE.Float32BufferAttribute(colorsLarge, 3));
+      const particlesLarge = new BufferGeometry();
+      particlesLarge.setAttribute('position', new Float32BufferAttribute(particleLargeVertices, 3));
+      particlesLarge.setAttribute('color', new Float32BufferAttribute(colorsLarge, 3));
 
-      const systemPointBigMaterial = new THREE.PointsMaterial({
+      const systemPointBigMaterial = new PointsMaterial({
         map: this.ED3DMap.textures.flareYellow,
         transparent: true,
         size: 16,
-        blending: THREE.AdditiveBlending,
+        blending: AdditiveBlending,
         depthTest: true,
         depthWrite: false,
       });
       this.ED3DMap.textures.disposeMaterialWhenDestroyed(systemPointBigMaterial);
 
-      this.particlePointsLarge = new THREE.Points(particlesLarge, systemPointBigMaterial);
+      this.particlePointsLarge = new Points(particlesLarge, systemPointBigMaterial);
       particlesLarge.center();
       this.particlePointsLarge.scale.set(20, 20, 20);
       this.galaxyCenter?.add(this.particlePointsLarge);
@@ -214,14 +217,17 @@ export class Galaxy {
 
   private async addOrShowGalaxyInformation(): Promise<void> {
     if (!this.ED3DMap.config.showGalaxyInfos) {
+      if (this.galaxyInfos) {
+        this.galaxyInfos.visible = false;
+      }
       return;
     }
-    else if (this.infos) {
-      this.infos.visible = true;
+    else if (this.galaxyInfos) {
+      this.galaxyInfos.visible = true;
       return;
     }
 
-    this.infos = new THREE.Object3D();
+    this.galaxyInfos = new Object3D();
     const milkywayDataQuery = await fetch("data/milkyway-ed.json");
     if (milkywayDataQuery.status === 200) {
       const milkywayData = await milkywayDataQuery.json() as MilkywayData;
@@ -246,21 +252,21 @@ export class Galaxy {
       }
     }
 
-    this.ED3DMap.addToScene(this.infos);
+    this.ED3DMap.addToScene(this.galaxyInfos);
   }
 
   public addText(text: string, x: number, y: number, z: number, rotation: number, size = 450, revert = false) {
     const shapes = this.ED3DMap.font!.generateShapes(text.toUpperCase(), size);
-    const geometry = new THREE.ShapeGeometry(shapes);
+    const geometry = new ShapeGeometry(shapes);
     geometry.computeBoundingBox();
     const xMid = - 0.5 * (geometry.boundingBox!.max.x - geometry.boundingBox!.min.x);
     geometry.translate(xMid, 0, 0);
 
-    const galaxyInfoTextMaterial = new THREE.MeshBasicMaterial({
+    const galaxyInfoTextMaterial = new MeshBasicMaterial({
       color: 0x999999,
       transparent: true,
       opacity: 0.7,
-      blending: THREE.AdditiveBlending,
+      blending: AdditiveBlending,
       depthWrite: false
     });
     this.ED3DMap.textures.disposeMaterialWhenDestroyed(galaxyInfoTextMaterial);
@@ -273,14 +279,14 @@ export class Galaxy {
     z -= middleTxt;
 
     textMesh.rotation.x = -Math.PI / 2;
-    geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(-Math.round(text.length * size / 2), 0, -middleTxt));
+    geometry.applyMatrix4(new Matrix4().makeTranslation(-Math.round(text.length * size / 2), 0, -middleTxt));
     if (rotation) {
-      textMesh.rotateOnAxis(new THREE.Vector3(0, 0, 1), Math.PI * (rotation) / 180);
+      textMesh.rotateOnAxis(new Vector3(0, 0, 1), Math.PI * (rotation) / 180);
     }
     textMesh.position.set(x, y, -z);
     textMesh.revert = revert;
 
-    this.infos!.add(textMesh);
+    this.galaxyInfos!.add(textMesh);
   }
 
   private async enableFarView(scale: number, withAnimation: boolean): Promise<void> {
@@ -385,8 +391,8 @@ export class Galaxy {
    * Show additional galaxy infos
    */
   private hideGalaxyInformation() {
-    if (this.infos !== null) {
-      this.infos.visible = false;
+    if (this.galaxyInfos !== null) {
+      this.galaxyInfos.visible = false;
     }
   }
 }
@@ -422,6 +428,6 @@ interface MilkywayData {
   };
 }
 
-class GalaxyMapTextMesh extends THREE.Mesh {
+class GalaxyMapTextMesh extends Mesh {
   public revert: boolean = false;
 }

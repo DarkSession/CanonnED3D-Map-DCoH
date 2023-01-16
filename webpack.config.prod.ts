@@ -1,8 +1,9 @@
 import * as path from 'path';
 import * as webpack from 'webpack';
 // in case you run into any typescript error when configuring `devServer`
-import 'webpack-dev-server';
 import CopyPlugin from "copy-webpack-plugin";
+import MiniCssExtractPlugin from "mini-css-extract-plugin";
+import CssMinimizerPlugin from "css-minimizer-webpack-plugin";
 
 const config: webpack.Configuration = {
   mode: 'production',
@@ -14,6 +15,10 @@ const config: webpack.Configuration = {
         test: /\.tsx?$/,
         use: 'ts-loader',
         exclude: /node_modules/,
+      },
+      {
+        test: /.s?css$/,
+        use: [MiniCssExtractPlugin.loader, "css-loader", "sass-loader"],
       },
     ],
   },
@@ -31,16 +36,24 @@ const config: webpack.Configuration = {
     library: "ED3DMap",
     clean: true,
   },
+  optimization: {
+    minimizer: [
+      `...`,
+      new CssMinimizerPlugin(),
+    ],
+  },
   plugins: [
     new CopyPlugin({
       patterns: [
         { from: "data", to: "data" },
         { from: "fonts", to: "fonts" },
+        { from: "images", to: "images" },
         { from: "textures", to: "textures" },
         { from: "*.html" },
         { from: "*.css" },
       ],
     }),
+    new MiniCssExtractPlugin(),
   ],
 };
 

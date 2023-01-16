@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import Stats from 'three/examples/jsm/libs/stats.module';
 import * as OrbitControls from "three/examples/jsm/controls/OrbitControls";
-import { GridHelper, HemisphereLight, Mesh, Object3D, PerspectiveCamera, Raycaster, Scene, WebGLRenderer, Intersection, BufferGeometry, Material, SpriteMaterial } from 'three';
+import { GridHelper, HemisphereLight, Mesh, Object3D, PerspectiveCamera, Raycaster, Scene, WebGLRenderer, Intersection, BufferGeometry, Material, SpriteMaterial, Points, PlaneGeometry, MeshBasicMaterial, DirectionalLight, Float32BufferAttribute, PointsMaterial, FogExp2, AdditiveBlending, Color, Sprite } from 'three';
 import Emittery from 'emittery';
 import { Galaxy } from './Galaxy';
 import { Font, FontLoader } from 'three/examples/jsm/loaders/FontLoader';
@@ -24,6 +24,8 @@ interface Events {
     ready: undefined;
     // fired whenever render() is executed
     render: RenderData;
+    //
+    configChanged: undefined;
     // 
     enableFarView: {
         scale: number;
@@ -37,6 +39,8 @@ interface Events {
     // 
     scaleChanged: number;
     //
+    systemsLoaded: undefined;
+    //
     systemHoverChanged: System | null;
     //
     systemSelectionChanged: System | null;
@@ -47,7 +51,7 @@ interface Events {
 export class ED3DMap {
     private tweens: Tween<any>[] = [];
     public camera: PerspectiveCamera;
-    private starField: THREE.Points;
+    private starField: Points;
     private scene: Scene;
     private renderer: WebGLRenderer;
     private plane: Mesh;
@@ -57,7 +61,7 @@ export class ED3DMap {
     private grid1H: GridHelper;
     private grid1K: GridHelper;
     private grid1XL: GridHelper;
-    private coordinatesGridText: THREE.Mesh | null = null;
+    private coordinatesGridText: Mesh | null = null;
     private coordinatesText: string | null = null;
     public events = new Emittery<Events>();
     public font: Font | null = null;
@@ -69,7 +73,7 @@ export class ED3DMap {
     public systemCategories: {
         [key: string]: {
             color: string;
-            spriteMaterial?: THREE.SpriteMaterial;
+            spriteMaterial?: SpriteMaterial;
             active: boolean;
         }
     } = {};
@@ -90,14 +94,14 @@ export class ED3DMap {
             }
         }
 
-        this.camera = new THREE.PerspectiveCamera(45, this.container.offsetWidth / this.container.offsetHeight, 1, 200000);
+        this.camera = new PerspectiveCamera(45, this.container.offsetWidth / this.container.offsetHeight, 1, 200000);
         if (this.config.startAnimation) {
             this.camera.position.set(-10000, 40000, 50000);
         } else {
             this.camera.position.set(500, 800, 1300);
         }
 
-        this.scene = new THREE.Scene();
+        this.scene = new Scene();
         this.scene.add(this.camera);
 
         this.stats = Stats();
@@ -107,40 +111,40 @@ export class ED3DMap {
         this.textures = new Textures(this);
 
         // grid
-        this.grid1H = new THREE.GridHelper(1000000, 10000, 0x111E23, 0x111E23);
+        this.grid1H = new GridHelper(1000000, 10000, 0x111E23, 0x111E23);
         this.scene.add(this.grid1H);
-        this.grid1K = new THREE.GridHelper(1000000, 1000, 0x22323A, 0x22323A);
+        this.grid1K = new GridHelper(1000000, 1000, 0x22323A, 0x22323A);
         this.scene.add(this.grid1K);
-        this.grid1XL = new THREE.GridHelper(1000000, 100, 0x22323A, 0x22323A);
+        this.grid1XL = new GridHelper(1000000, 100, 0x22323A, 0x22323A);
         this.scene.add(this.grid1XL);
 
         //
-        this.raycaster = new THREE.Raycaster();
+        this.raycaster = new Raycaster();
         this.raycaster.params.Points!.threshold = 4;
 
-        const planeGeometry = new THREE.PlaneGeometry(1000, 1000);
+        const planeGeometry = new PlaneGeometry(1000, 1000);
         planeGeometry.rotateX(- Math.PI / 2);
 
-        const material = new THREE.MeshBasicMaterial({ visible: false });
+        const material = new MeshBasicMaterial({ visible: false });
         this.textures.disposeMaterialWhenDestroyed(material);
 
-        this.plane = new THREE.Mesh(planeGeometry, material);
+        this.plane = new Mesh(planeGeometry, material);
         this.scene.add(this.plane);
 
         // lights
-        this.light = new THREE.HemisphereLight(0xffffff, 0xcccccc);
+        this.light = new HemisphereLight(0xffffff, 0xcccccc);
         this.light.position.set(-0.2, 0.5, 0.8).normalize();
         this.scene.add(this.light);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff);
+        const directionalLight = new DirectionalLight(0xffffff);
         directionalLight.position.set(1, 0.75, 0.5).normalize();
         this.scene.add(directionalLight);
 
-        this.renderer = new THREE.WebGLRenderer({
+        this.renderer = new WebGLRenderer({
             antialias: true,
             alpha: true,
         });
-        //this.renderer.setPixelRatio(window.devicePixelRatio);
+        // this.renderer.setPixelRatio(window.devicePixelRatio);
         // this.renderer.setSize(window.innerWidth, window.innerHeight);
         // this.renderer.sortObjects = false
         this.renderer.setClearColor(0x000000, 1);
@@ -160,7 +164,7 @@ export class ED3DMap {
         this.controls.addEventListener("change", () => {
             this.requestRender();
         });
-        //this.controls.dampingFactor = 0.3;
+        // this.controls.dampingFactor = 0.3;
 
         const sizeStars = 10000;
 
@@ -172,22 +176,22 @@ export class ED3DMap {
             vertices.push(x, y, z);
         }
 
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        const geometry = new BufferGeometry();
+        geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3));
 
-        const particleMaterial = new THREE.PointsMaterial({
+        const particleMaterial = new PointsMaterial({
             color: 0xeeeeee,
             size: 20,
         });
         this.textures.disposeMaterialWhenDestroyed(particleMaterial);
 
-        this.starField = new THREE.Points(geometry, particleMaterial);
+        this.starField = new Points(geometry, particleMaterial);
         this.scene.add(this.starField);
 
         // Add Fog
-        this.scene.fog = new THREE.FogExp2(0x0D0D10, 0.000128);
+        this.scene.fog = new FogExp2(0x0D0D10, 0.000128);
         this.renderer.setClearColor(this.scene.fog.color, 1);
-        this.fogDensity = (this.scene.fog as THREE.FogExp2).density;
+        this.fogDensity = (this.scene.fog as FogExp2).density;
 
         new Galaxy(this);
         new Action(this);
@@ -209,6 +213,9 @@ export class ED3DMap {
         this.events.on("toggleCategoryFilter", async (categoryName: string) => {
             await this.toggleCategoryFilter(categoryName);
         });
+        this.events.on("configChanged", () => {
+            this.requestRender();
+        });
     }
 
     public async start(): Promise<void> {
@@ -218,62 +225,7 @@ export class ED3DMap {
         await this.events.emit("init");
         console.log("init done");
 
-        if (this.config.systems) {
-            for (const system of this.config.systems) {
-                new System(this, system);
-            }
-        }
-
-        const particleMaterial = new THREE.PointsMaterial({
-            size: 0,
-            fog: false,
-            blending: THREE.AdditiveBlending,
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0,
-        });
-
-        this.textures.disposeMaterialWhenDestroyed(particleMaterial);
-
-        for (const system of this.systems) {
-            let spriteMaterial = this.textures.glow1;
-            if (system.configuration.categories?.length) {
-                const category = system.configuration.categories[0];
-                if (this.systemCategories[category]) {
-                    const systemCategoryColor = this.systemCategories[category];
-                    if (!systemCategoryColor.spriteMaterial) {
-                        systemCategoryColor.spriteMaterial = new THREE.SpriteMaterial({
-                            map: this.textures.flareYellow,
-                            transparent: true,
-                            fog: false,
-                            blending: THREE.AdditiveBlending,
-                            color: new THREE.Color("#" + systemCategoryColor.color),
-                            opacity: 0.8,
-                        });
-                    }
-                    spriteMaterial = systemCategoryColor.spriteMaterial;
-                }
-            }
-            const sprite = new THREE.Sprite(spriteMaterial);
-            sprite.position.set(system.x, system.y, system.z);
-            sprite.scale.set(16, 16, 1.0);
-            this.scene.add(sprite);
-            {
-                const vertices = [0, 0, 0];
-                const geometry = new THREE.BufferGeometry();
-                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-
-                const particle = new SystemPoint(system, sprite, geometry, particleMaterial);
-                particle.position.set(system.x, system.y, system.z);
-                this.scene.add(particle);
-
-                if (system.children) {
-                    for (const child of system.children) {
-                        particle.add(child);
-                    }
-                }
-            }
-        }
+        await this.updateSystems(this.config.systems);
 
         this.scene.add(this.setCoordinatesText("Coordinates", 0, 0, 0));
 
@@ -290,6 +242,62 @@ export class ED3DMap {
         await this.events.emit("ready");
     }
 
+    public async updateSystems(systems: SystemConfiguration[]): Promise<void> {
+        this.config.systems = systems;
+
+        this.scene.remove(...this.scene.children.filter(c => c instanceof SystemPoint || c instanceof SystemSprite));
+
+        this.systems = this.systems.filter(s => s.permanent);
+        if (this.config.systems) {
+            for (const system of this.config.systems) {
+                new System(this, system);
+            }
+        }
+
+        for (const system of this.systems) {
+            let spriteMaterial = this.textures.glow1;
+            if (system.configuration.categories?.length) {
+                const category = system.configuration.categories[0];
+                if (this.systemCategories[category]) {
+                    const systemCategoryColor = this.systemCategories[category];
+                    if (!systemCategoryColor.spriteMaterial) {
+                        systemCategoryColor.spriteMaterial = new SpriteMaterial({
+                            map: this.textures.flareYellow,
+                            transparent: true,
+                            fog: false,
+                            blending: AdditiveBlending,
+                            color: new Color("#" + systemCategoryColor.color),
+                            opacity: 0.8,
+                        });
+                    }
+                    spriteMaterial = systemCategoryColor.spriteMaterial;
+                }
+            }
+            const sprite = new SystemSprite(system, spriteMaterial);
+            sprite.position.set(system.x, system.y, system.z);
+            sprite.scale.set(16, 16, 1.0);
+
+            this.scene.add(sprite);
+            const vertices = [0, 0, 0];
+            const geometry = new BufferGeometry();
+            geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3));
+
+            const particle = new SystemPoint(system, sprite, geometry, this.textures.systemPointMaterial);
+            particle.position.set(system.x, system.y, system.z);
+            this.scene.add(particle);
+            if (system.children) {
+                for (const child of system.children) {
+                    particle.add(child);
+                }
+            }
+            system.systemPoint = particle;
+        }
+
+        await this.events.emit("systemsLoaded");
+
+        this.requestRender();
+    }
+
     private async toggleCategoryFilter(categoryName: string): Promise<void> {
         const active = this.systemCategories[categoryName].active;
         const material = active ? this.systemCategories[categoryName].spriteMaterial : this.textures.systemSpriteDisabled;
@@ -298,7 +306,12 @@ export class ED3DMap {
         }
         for (const object3d of this.scene.children) {
             if (object3d instanceof SystemPoint && object3d.system.configuration.categories?.includes(categoryName)) {
-                object3d.sprite.material = material;
+                if (this.config.hideFilteredSystems) {
+                    object3d.sprite.visible = active;
+                }
+                else {
+                    object3d.sprite.material = material;
+                }
             }
         }
         this.requestRender();
@@ -315,7 +328,7 @@ export class ED3DMap {
         this.render();
     }
 
-    private setCoordinatesText(text: string, x: number, y: number, z: number): THREE.Mesh {
+    private setCoordinatesText(text: string, x: number, y: number, z: number): Mesh {
         const textShapes = this.font!.generateShapes(text, 5);
         const textGeo = new THREE.ShapeGeometry(textShapes);
         if (this.coordinatesGridText) {
@@ -502,6 +515,14 @@ export class ED3DMap {
         }
     }
 
+    public findSystemByName(systemName: string, exact: boolean = true, visibleOnly: boolean = true): System | undefined {
+        if (exact) {
+            return this.systems.find(s => s.configuration.name === systemName && (!visibleOnly || s.isVisible));
+        }
+        const name = systemName.trim().toUpperCase();
+        return this.systems.find(s => s.configuration.name === name && (!visibleOnly || s.isVisible));
+    }
+
     private distanceFromTarget(object3D: Object3D) {
         const dx = Math.abs(object3D.position.x - this.controls.target.x);
         const dy = Math.abs(object3D.position.y - this.controls.target.y);
@@ -522,7 +543,7 @@ export class ED3DMap {
         this.grid1K.visible = false;
         this.grid1XL.visible = true;
         this.starField.visible = false;
-        if (this.scene.fog instanceof THREE.FogExp2) {
+        if (this.scene.fog instanceof FogExp2) {
             this.scene.fog.density = 0.000009;
         }
     }
@@ -541,7 +562,7 @@ export class ED3DMap {
         this.grid1K.visible = true;
         this.grid1XL.visible = false;
         this.starField.visible = true;
-        if (this.scene.fog instanceof THREE.FogExp2) {
+        if (this.scene.fog instanceof FogExp2) {
             this.scene.fog.density = this.fogDensity;
         }
     }
@@ -560,6 +581,7 @@ interface ED3DMapConfiguration {
             [key: string]: SystemCategory;
         };
     };
+    hideFilteredSystems: boolean;
     withOptionsPanel: boolean;
     withHudPanel: boolean;
     showSystemSearch: boolean;
@@ -570,7 +592,7 @@ interface SystemCategory {
     color: string;
 }
 
-export class SystemMesh extends THREE.Mesh {
+export class SystemMesh extends Mesh {
     public clickable: boolean = true;
     public spriteId: number | undefined;
 }
@@ -578,13 +600,21 @@ export class SystemMesh extends THREE.Mesh {
 export class SystemPoint<
     TGeometry extends BufferGeometry = BufferGeometry,
     TMaterial extends Material | Material[] = Material | Material[],
-> extends THREE.Points {
+> extends Points {
     public constructor(
         public readonly system: System,
-        public sprite: THREE.Sprite,
+        public sprite: Sprite,
         geometry?: TGeometry,
         material?: TMaterial) {
         super(geometry, material);
+    }
+}
+
+export class SystemSprite extends Sprite {
+    public constructor(
+        public readonly system: System,
+        material?: SpriteMaterial) {
+        super(material);
     }
 }
 

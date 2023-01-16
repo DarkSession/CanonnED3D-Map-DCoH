@@ -1,9 +1,9 @@
-import * as THREE from 'three';
+import { Vector2 } from 'three';
 import { ED3DMap, SystemPoint } from './ED3DMap';
 import { System } from './System';
 
 export class Action {
-    private pointer: THREE.Vector2;
+    private pointer: Vector2;
     private currentSystemHover: SystemPoint | null = null;
     private currentSystemSelected: SystemPoint | null = null;
     private pointerClickStart: number | null = null;
@@ -11,7 +11,7 @@ export class Action {
 
     public constructor(
         private readonly ED3DMap: ED3DMap) {
-        this.pointer = new THREE.Vector2();
+        this.pointer = new Vector2();
         this.ED3DMap.events.on("init", () => {
             this.init();
         });
@@ -47,14 +47,14 @@ export class Action {
         const intersects = this.ED3DMap.raycasterIntersectObjects(this.pointer);
         let systemFound = false;
         if (intersects.length) {
-            const intersectSystemPoints = intersects.filter(i => i.object instanceof SystemPoint).sort((a, b) => {
+            const intersectSystemPoints = intersects.filter(i => i.object instanceof SystemPoint && i.object.visible && i.object.sprite.visible).sort((a, b) => {
                 if (a.distanceToRay && b.distanceToRay) {
                     return a.distanceToRay - b.distanceToRay;
                 }
                 return a.distance - b.distance;
             });
             for (const intersect of intersectSystemPoints) {
-                if (intersect.object instanceof SystemPoint && intersect.object.visible) {
+                if (intersect.object instanceof SystemPoint) {
                     if (this.currentSystemHover !== intersect.object) {
                         this.currentSystemHover = intersect.object;
                         await this.ED3DMap.events.emit("systemHoverChanged", intersect.object.system);

@@ -40,6 +40,7 @@ const config: webpack.Configuration = {
       patterns: [
         { from: "data", to: "data" },
         { from: "fonts", to: "fonts" },
+        { from: "images", to: "images" },
         { from: "textures", to: "textures" },
         { from: "*.html" },
         { from: "*.css" },

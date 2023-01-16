@@ -1,11 +1,13 @@
 import { Object3D } from 'three';
-import { ED3DMap } from './ED3DMap';
+import { ED3DMap, SystemPoint } from './ED3DMap';
 
 export class System {
     public readonly x: number;
     public readonly y: number;
     public readonly z: number;
     public children: Object3D[] = [];
+    public permanent = false;
+    public systemPoint: SystemPoint | null = null;
 
     public constructor(
         private readonly ED3DMap: ED3DMap,
@@ -20,6 +22,10 @@ export class System {
 
     public add(object3d: Object3D): void {
         this.children.push(object3d);
+    }
+
+    public get isVisible(): boolean {
+        return !!(this.systemPoint && this.systemPoint.sprite && this.systemPoint.sprite.visible);
     }
 }
 

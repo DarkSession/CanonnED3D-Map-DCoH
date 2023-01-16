@@ -1,6 +1,6 @@
 
 import * as THREE from 'three';
-import { Material, MeshBasicMaterial, MeshPhongMaterial, SpriteMaterial, Texture } from 'three';
+import { AdditiveBlending, Material, MeshBasicMaterial, MeshPhongMaterial, PointsMaterial, SpriteMaterial, Texture } from 'three';
 import { ED3DMap } from './ED3DMap';
 
 export class Textures {
@@ -16,7 +16,7 @@ export class Textures {
     public black: MeshBasicMaterial;
     public darkBlue: MeshBasicMaterial;
     public selected: MeshPhongMaterial;
-
+    public systemPointMaterial!: PointsMaterial;
     private materialDisposeList: Material[] = [];
 
     public constructor(
@@ -28,19 +28,19 @@ export class Textures {
         this.ED3DMap.events.on("destroy", () => {
             this.destroy();
         });
-        this.white = new THREE.MeshBasicMaterial({
+        this.white = new MeshBasicMaterial({
             color: 0xffffff
         });
-        this.gray = new THREE.MeshPhongMaterial({
+        this.gray = new MeshPhongMaterial({
             color: 0x7EA0A0
         });
-        this.black = new THREE.MeshBasicMaterial({
+        this.black = new MeshBasicMaterial({
             color: 0x010101
         });
-        this.darkBlue = new THREE.MeshBasicMaterial({
+        this.darkBlue = new MeshBasicMaterial({
             color: 0x16292B
         });
-        this.selected = new THREE.MeshPhongMaterial({
+        this.selected = new MeshPhongMaterial({
             color: 0x0DFFFF
         });
     }
@@ -83,27 +83,35 @@ export class Textures {
             this.flareWhite = await texloader.loadAsync("textures/flare2.png");
         })()]);
 
-        this.glow1 = new THREE.SpriteMaterial({
+        this.glow1 = new SpriteMaterial({
             map: this.flareYellow,
             color: 0xffffff,
             transparent: true,
             fog: true,
-            blending: THREE.AdditiveBlending,
+            blending: AdditiveBlending,
             depthWrite: false,
         });
-        this.glow2 = new THREE.SpriteMaterial({
+        this.glow2 = new SpriteMaterial({
             map: this.flareWhite,
             transparent: true,
-            blending: THREE.AdditiveBlending,
+            blending: AdditiveBlending,
             depthWrite: true,
             opacity: 0.5,
         });
-        this.systemSpriteDisabled = new THREE.SpriteMaterial({
+        this.systemSpriteDisabled = new SpriteMaterial({
             map: this.flareYellow,
             transparent: true,
             fog: false,
-            blending: THREE.AdditiveBlending,
+            blending: AdditiveBlending,
             opacity: 0.1,
+        });
+        this.systemPointMaterial = new PointsMaterial({
+            size: 0,
+            fog: false,
+            blending: AdditiveBlending,
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0,
         });
         console.log("Textures loaded.");
     }
