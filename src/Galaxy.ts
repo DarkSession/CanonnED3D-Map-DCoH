@@ -71,7 +71,6 @@ export class Galaxy {
     this.galaxyCenter = new System(this.ED3DMap, {
       name: 'Sagittarius A*',
       coordinates: { x: this.y, y: this.y, z: this.z },
-      categories: [],
     });
     this.galaxyCenter.permanent = true;
 

@@ -208,8 +208,9 @@ export class HUD {
                     this.filterContainerElement.hidden = true;
                 }
                 if (this.systemInformationElement) {
-                    if (this.activeSystem.configuration.description) {
-                        this.systemInformationElement.innerHTML = this.activeSystem.configuration.description;
+                    this.systemInformationElement.hidden = false;
+                    if (this.activeSystem.description) {
+                        this.systemInformationElement.innerHTML = this.activeSystem.description;
                     }
                     else {
                         this.systemInformationElement.innerText = "";
@@ -220,12 +221,15 @@ export class HUD {
                 }
             }
             else {
-                this.titleElement.innerText = "Infos";
+                this.titleElement.innerText = "Information";
                 if (this.searchContainerElement && this.ED3DMap.config.showSystemSearch) {
                     this.searchContainerElement.hidden = false;
                 }
                 if (this.filterContainerElement) {
                     this.filterContainerElement.hidden = false;
+                }
+                if (this.systemInformationElement) {
+                    this.systemInformationElement.hidden = true;
                 }
                 if (this.navigationContainerElement) {
                     this.navigationContainerElement.hidden = true;
@@ -239,41 +243,47 @@ export class HUD {
             while (this.filterContainerElement.hasChildNodes()) {
                 this.filterContainerElement.removeChild(this.filterContainerElement.firstChild!);
             }
-            for (const categoryName of Object.keys(this.ED3DMap.config.categories)) {
-                const titleElement = document.createElement("h2");
-                this.filterContainerElement.append(titleElement);
-                titleElement.innerText = categoryName;
-                for (const category of Object.keys(this.ED3DMap.config.categories[categoryName])) {
-                    const categoryConfiguration = this.ED3DMap.config.categories[categoryName][category];
+            if (this.ED3DMap.config.categories && this.ED3DMap.config.systems) {
+                for (const categoryName of Object.keys(this.ED3DMap.config.categories)) {
+                    const titleElement = document.createElement("h2");
+                    this.filterContainerElement.append(titleElement);
+                    titleElement.innerText = categoryName;
+                    for (const category of Object.keys(this.ED3DMap.config.categories[categoryName])) {
+                        const categoryConfiguration = this.ED3DMap.config.categories[categoryName][category];
 
-                    const filter = document.createElement("a");
-                    this.filterContainerElement.append(filter);
-                    filter.classList.add("map_filter");
+                        const filter = document.createElement("a");
+                        this.filterContainerElement.append(filter);
+                        filter.classList.add("map_filter");
 
-                    if (this.ED3DMap.systemCategories[category]) {
-                        filter.onclick = async () => {
-                            if (this.ED3DMap.systemCategories[category]) {
-                                this.ED3DMap.systemCategories[category].active = !this.ED3DMap.systemCategories[category].active;
-                                if (this.ED3DMap.systemCategories[category].active) {
-                                    filterCheck.classList.remove("disabled");
+                        const filterCheck = document.createElement("span");
+                        filter.append(filterCheck);
+                        filterCheck.classList.add("check");
+                        filterCheck.style.backgroundColor = "#" + categoryConfiguration.color;
+
+                        
+                        if (this.ED3DMap.systemCategories[category]) {
+                            filter.onclick = async () => {
+                                if (this.ED3DMap.systemCategories[category]) {
+                                    this.ED3DMap.systemCategories[category].active = !this.ED3DMap.systemCategories[category].active;
+                                    if (this.ED3DMap.systemCategories[category].active) {
+                                        filterCheck.classList.remove("disabled");
+                                    }
+                                    else {
+                                        filterCheck.classList.add("disabled");
+                                    }
+                                    await this.ED3DMap.events.emit("toggleCategoryFilter", category);
                                 }
-                                else {
-                                    filterCheck.classList.add("disabled");
-                                }
-                                await this.ED3DMap.events.emit("toggleCategoryFilter", category);
+                            };
+                            if (!this.ED3DMap.systemCategories[category].active) {
+                                filterCheck.classList.add("disabled");
                             }
-                        };
+                        }
+
+                        filter.append(document.createTextNode(categoryConfiguration.name));
+
+                        const systemsCount = this.ED3DMap.systems.filter(s => s.categories?.includes(category ?? false)).length;
+                        filter.append(document.createTextNode(` (${systemsCount})`));
                     }
-
-                    const filterCheck = document.createElement("span");
-                    filter.append(filterCheck);
-                    filterCheck.classList.add("check");
-                    filterCheck.style.backgroundColor = "#" + categoryConfiguration.color;
-
-                    filter.append(document.createTextNode(categoryConfiguration.name));
-
-                    const systemsCount = this.ED3DMap.config.systems.filter(s => s.categories?.includes(category ?? false)).length;
-                    filter.append(document.createTextNode(` (${systemsCount})`));
                 }
             }
         }

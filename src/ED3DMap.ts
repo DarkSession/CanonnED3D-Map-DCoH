@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import Stats from 'three/examples/jsm/libs/stats.module';
 import * as OrbitControls from "three/examples/jsm/controls/OrbitControls";
-import { GridHelper, HemisphereLight, Mesh, Object3D, PerspectiveCamera, Raycaster, Scene, WebGLRenderer, Intersection, BufferGeometry, Material, SpriteMaterial, Points, PlaneGeometry, MeshBasicMaterial, DirectionalLight, Float32BufferAttribute, PointsMaterial, FogExp2, AdditiveBlending, Color, Sprite } from 'three';
+import * as FlyControls from "three/examples/jsm/controls/FlyControls";
+import { GridHelper, HemisphereLight, Mesh, Object3D, PerspectiveCamera, Raycaster, Scene, WebGLRenderer, Intersection, BufferGeometry, Material, SpriteMaterial, Points, PlaneGeometry, MeshBasicMaterial, DirectionalLight, Float32BufferAttribute, PointsMaterial, FogExp2, AdditiveBlending, Color, Sprite, Clock, Vector3 } from 'three';
 import Emittery from 'emittery';
 import { Galaxy } from './Galaxy';
 import { Font, FontLoader } from 'three/examples/jsm/loaders/FontLoader';
@@ -51,7 +52,6 @@ interface Events {
 export class ED3DMap {
     private tweens: Tween<any>[] = [];
     public camera: PerspectiveCamera;
-    private starField: Points;
     private scene: Scene;
     private renderer: WebGLRenderer;
     private plane: Mesh;
@@ -66,34 +66,25 @@ export class ED3DMap {
     public events = new Emittery<Events>();
     public font: Font | null = null;
     public textures: Textures;
-    private systems: System[] = [];
+    public systems: System[] = [];
     private farView: boolean = false;
     private fogDensity: number = 0;
     private previousScale = -1;
     public systemCategories: {
         [key: string]: {
             color: string;
-            spriteMaterial?: SpriteMaterial;
+            spriteMaterial: SpriteMaterial;
             active: boolean;
         }
     } = {};
-    private stats: Stats;
+    private stats: Stats | null = null;
     private renderRequested: boolean = false;
+    private clock = new Clock();
 
     public constructor(
         private readonly container: HTMLElement,
         public readonly config: ED3DMapConfiguration
     ) {
-        for (const categoryName of Object.keys(this.config.categories)) {
-            for (const category of Object.keys(this.config.categories[categoryName])) {
-                const categoryConfiguration = this.config.categories[categoryName][category];
-                this.systemCategories[category] = {
-                    color: categoryConfiguration.color,
-                    active: true,
-                };
-            }
-        }
-
         this.camera = new PerspectiveCamera(45, this.container.offsetWidth / this.container.offsetHeight, 1, 200000);
         if (this.config.startAnimation) {
             this.camera.position.set(-10000, 40000, 50000);
@@ -104,9 +95,11 @@ export class ED3DMap {
         this.scene = new Scene();
         this.scene.add(this.camera);
 
-        this.stats = Stats();
-        this.stats.dom.style.cssText = 'position:absolute;bottom:0px;left:0px;';
-        container.appendChild(this.stats.dom);
+        if (this.config.showFpsStats) {
+            this.stats = Stats();
+            this.stats.dom.style.cssText = 'position:absolute;bottom:0px;left:0px;';
+            container.appendChild(this.stats.dom);
+        }
 
         this.textures = new Textures(this);
 
@@ -180,13 +173,10 @@ export class ED3DMap {
         geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3));
 
         const particleMaterial = new PointsMaterial({
-            color: 0xeeeeee,
+            color: new Color(255, 0, 0), // 0xeeeeee
             size: 20,
         });
         this.textures.disposeMaterialWhenDestroyed(particleMaterial);
-
-        this.starField = new Points(geometry, particleMaterial);
-        this.scene.add(this.starField);
 
         // Add Fog
         this.scene.fog = new FogExp2(0x0D0D10, 0.000128);
@@ -225,7 +215,9 @@ export class ED3DMap {
         await this.events.emit("init");
         console.log("init done");
 
-        await this.updateSystems(this.config.systems);
+        if (this.config.systems) {
+            await this.updateSystems(this.config.systems, this.config.categories);
+        }
 
         this.scene.add(this.setCoordinatesText("Coordinates", 0, 0, 0));
 
@@ -242,40 +234,85 @@ export class ED3DMap {
         await this.events.emit("ready");
     }
 
-    public async updateSystems(systems: SystemConfiguration[]): Promise<void> {
-        this.config.systems = systems;
+    public async updateSystems(systems: SystemConfiguration[], categories?: ED3DMapCategories, activeCategories?: string[]): Promise<void> {
+        if (categories) {
+            this.config.categories = categories;
+            if (activeCategories) {
+                this.config.activeCategories = activeCategories;
+            }
+            activeCategories = activeCategories ?? this.config.activeCategories;
+            for (const category of Object.keys(this.systemCategories)) {
+                this.systemCategories[category].spriteMaterial.dispose();
+            }
+            this.systemCategories = {};
+            for (const categoryName of Object.keys(this.config.categories)) {
+                for (const category of Object.keys(this.config.categories[categoryName])) {
+                    const categoryConfiguration = this.config.categories[categoryName][category];
+                    this.systemCategories[category] = {
+                        color: categoryConfiguration.color,
+                        active: activeCategories?.includes(category) ?? true,
+                        spriteMaterial: new SpriteMaterial({
+                            map: this.textures.flareYellow,
+                            transparent: true,
+                            fog: false,
+                            blending: AdditiveBlending,
+                            color: new Color("#" + categoryConfiguration.color),
+                            opacity: 0.8,
+                        }),
+                    };
+                }
+            }
+        }
 
+        this.config.systems = systems;
         this.scene.remove(...this.scene.children.filter(c => c instanceof SystemPoint || c instanceof SystemSprite));
 
         this.systems = this.systems.filter(s => s.permanent);
         if (this.config.systems) {
             for (const system of this.config.systems) {
-                new System(this, system);
+                const existingSystem = this.systems.find(s => s.configuration.name === system.name);
+                if (existingSystem) {
+                    if (system.description) {
+                        existingSystem.description += "<br>" + system.description;
+                    }
+                    if (system.categories) {
+                        if (!existingSystem.categories) {
+                            existingSystem.categories = system.categories;
+                        }
+                        else {
+                            for (const category of system.categories) {
+                                if (!existingSystem.categories.includes(category)) {
+                                    existingSystem.categories.push(category);
+                                }
+                            }
+                        }
+                    }
+                }
+                else {
+                    new System(this, system);
+                }
             }
         }
 
         for (const system of this.systems) {
             let spriteMaterial = this.textures.glow1;
-            if (system.configuration.categories?.length) {
-                const category = system.configuration.categories[0];
-                if (this.systemCategories[category]) {
-                    const systemCategoryColor = this.systemCategories[category];
-                    if (!systemCategoryColor.spriteMaterial) {
-                        systemCategoryColor.spriteMaterial = new SpriteMaterial({
-                            map: this.textures.flareYellow,
-                            transparent: true,
-                            fog: false,
-                            blending: AdditiveBlending,
-                            color: new Color("#" + systemCategoryColor.color),
-                            opacity: 0.8,
-                        });
-                    }
-                    spriteMaterial = systemCategoryColor.spriteMaterial;
+            let isDisabled = this.isSystemFiltered(system);
+            if (system.categories?.length) {
+                const category = system.categories.find(c => this.systemCategories[c]?.active);
+                if (category && this.systemCategories[category]) {
+                    spriteMaterial = this.systemCategories[category].spriteMaterial;
+                }
+                if (isDisabled && !this.config.hideFilteredSystems) {
+                    spriteMaterial = this.textures.systemSpriteDisabled;
                 }
             }
             const sprite = new SystemSprite(system, spriteMaterial);
             sprite.position.set(system.x, system.y, system.z);
             sprite.scale.set(16, 16, 1.0);
+
+            if (isDisabled && this.config.hideFilteredSystems) {
+                sprite.visible = false;
+            }
 
             this.scene.add(sprite);
             const vertices = [0, 0, 0];
@@ -301,20 +338,40 @@ export class ED3DMap {
     private async toggleCategoryFilter(categoryName: string): Promise<void> {
         const active = this.systemCategories[categoryName].active;
         const material = active ? this.systemCategories[categoryName].spriteMaterial : this.textures.systemSpriteDisabled;
-        if (!material) {
-            return;
-        }
         for (const object3d of this.scene.children) {
-            if (object3d instanceof SystemPoint && object3d.system.configuration.categories?.includes(categoryName)) {
-                if (this.config.hideFilteredSystems) {
-                    object3d.sprite.visible = active;
+            if (object3d instanceof SystemPoint) {
+                if (this.isSystemFiltered(object3d.system)) {
+                    if (this.config.hideFilteredSystems) {
+                        object3d.sprite.visible = false;
+                    }
+                    else {
+                        object3d.sprite.material = this.textures.systemSpriteDisabled!;
+                    }
                 }
                 else {
-                    object3d.sprite.material = material;
+                    if (this.config.hideFilteredSystems) {
+                        object3d.sprite.visible = true;
+                    }
+                    if (object3d.system.categories) {
+                        const categoryName = object3d.system.categories.find(c => this.systemCategories[c]?.active);
+                        if (categoryName && this.systemCategories[categoryName]) {
+                            object3d.sprite.material = this.systemCategories[categoryName].spriteMaterial!;
+                        }
+                    }
                 }
             }
         }
         this.requestRender();
+    }
+
+    private isSystemFiltered(system: System): boolean {
+        if (!system.categories) {
+            return false;
+        }
+        if (this.config.systemCategoryFilterMatchAny) {
+            return !system.categories.some(c => this.systemCategories[c]?.active);
+        }
+        return !system.categories.every(c => this.systemCategories[c]?.active);
     }
 
     public requestRender(): void {
@@ -322,10 +379,10 @@ export class ED3DMap {
     }
 
     private onWindowResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.aspect = this.container.offsetWidth / this.container.offsetHeight;
         this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.render();
+        this.renderer.setSize(this.container.offsetWidth, this.container.offsetHeight);
+        this.requestRender();
     }
 
     private setCoordinatesText(text: string, x: number, y: number, z: number): Mesh {
@@ -366,7 +423,7 @@ export class ED3DMap {
             const distance = this.distanceFromTarget(this.camera);
             const scale = distance / 200;
 
-            this.stats.update();
+            this.stats?.update();
 
             const renderData = {
                 time: time,
@@ -386,12 +443,6 @@ export class ED3DMap {
                 await this.events.emit("scaleChanged", scale);
                 renderData.render = true;
             }
-
-            this.starField.position.set(
-                this.controls.target.x - (this.controls.target.x / 10) % 4000,
-                this.controls.target.y - (this.controls.target.y / 10) % 4000,
-                this.controls.target.z - (this.controls.target.z / 10) % 4000
-            );
 
             if (this.coordinatesGridText) {
                 const size = 100;
@@ -417,7 +468,16 @@ export class ED3DMap {
                     }
                 }
             }
-            this.controls.update();
+            const delta = this.clock.getDelta();
+            if (this.controls instanceof OrbitControls.OrbitControls) {
+                this.controls.update();
+            }
+            /*
+            else if (this.controls instanceof FlyControls.FlyControls) {
+                this.controls.update(delta);
+            }
+            */
+
             if (this.renderRequested) {
                 this.renderRequested = false;
                 renderData.render = true;
@@ -471,19 +531,25 @@ export class ED3DMap {
                 .start()
                 .onUpdate(() => {
                     this.camera.position.set(moveFrom.x, moveFrom.y, moveFrom.z);
-                    this.controls.target.set(moveFrom.mx, moveFrom.my, moveFrom.mz);
+                    if (this.controls instanceof OrbitControls.OrbitControls) {
+                        this.controls.target.set(moveFrom.mx, moveFrom.my, moveFrom.mz);
+                    }
                 })
                 .onComplete(() => {
-                    this.controls.update();
+                    if (this.controls instanceof OrbitControls.OrbitControls) {
+                        this.controls.update();
+                    }
                 });
 
             // 3D Cursor on selected object
-
             // this.addCursorOnSelect(goX, goY, goZ);
         }
         else {
             this.camera.position.set(moveTo.x, moveTo.y, moveTo.z);
-            this.controls.target.set(moveTo.mx, moveTo.my, moveTo.mz);
+            if (this.controls instanceof OrbitControls.OrbitControls) {
+                this.controls.target.set(moveTo.mx, moveTo.my, moveTo.mz);
+            }
+            this.camera.lookAt(new Vector3(x, y, z));
         }
         this.enableControls();
     }
@@ -493,15 +559,22 @@ export class ED3DMap {
     }
 
     public enableControls(): void {
-        this.controls.enabled = true;
+        if (this.controls instanceof OrbitControls.OrbitControls) {
+            this.controls.enabled = true;
+        }
     }
 
     public disableControls(): void {
-        this.controls.enabled = false;
+        if (this.controls instanceof OrbitControls.OrbitControls) {
+            this.controls.enabled = false;
+        }
     }
 
     public get controlsEnabled(): boolean {
-        return this.controls.enabled;
+        if (this.controls instanceof OrbitControls.OrbitControls) {
+            return this.controls.enabled;
+        }
+        return true;
     }
 
     public raycasterIntersectObjects(coords: { x: number; y: number }): Intersection<Object3D<THREE.Event>>[] {
@@ -524,10 +597,13 @@ export class ED3DMap {
     }
 
     private distanceFromTarget(object3D: Object3D) {
-        const dx = Math.abs(object3D.position.x - this.controls.target.x);
-        const dy = Math.abs(object3D.position.y - this.controls.target.y);
-        const dz = Math.abs(object3D.position.z - this.controls.target.z);
-        return Math.round(Math.sqrt(dx * dx + dy * dy + dz * dz));
+        if (this.controls instanceof OrbitControls.OrbitControls) {
+            const dx = Math.abs(object3D.position.x - this.controls.target.x);
+            const dy = Math.abs(object3D.position.y - this.controls.target.y);
+            const dz = Math.abs(object3D.position.z - this.controls.target.z);
+            return Math.round(Math.sqrt(dx * dx + dy * dy + dz * dz));
+        }
+        return 0;
     }
 
     private async enableFarView(scale: number, withAnimation: boolean = true): Promise<void> {
@@ -542,7 +618,6 @@ export class ED3DMap {
         this.grid1H.visible = false;
         this.grid1K.visible = false;
         this.grid1XL.visible = true;
-        this.starField.visible = false;
         if (this.scene.fog instanceof FogExp2) {
             this.scene.fog.density = 0.000009;
         }
@@ -561,7 +636,6 @@ export class ED3DMap {
         this.grid1H.visible = true;
         this.grid1K.visible = true;
         this.grid1XL.visible = false;
-        this.starField.visible = true;
         if (this.scene.fog instanceof FogExp2) {
             this.scene.fog.density = this.fogDensity;
         }
@@ -572,19 +646,24 @@ export class ED3DMap {
     }
 }
 
-interface ED3DMapConfiguration {
-    showGalaxyInfos: boolean;
-    startAnimation: boolean;
-    systems: SystemConfiguration[];
-    categories: {
-        [key: string]: {
-            [key: string]: SystemCategory;
-        };
+export interface ED3DMapConfiguration {
+    showGalaxyInfos?: boolean;
+    startAnimation?: boolean;
+    systems?: SystemConfiguration[];
+    categories?: ED3DMapCategories;
+    activeCategories?: string[];
+    hideFilteredSystems?: boolean;
+    withOptionsPanel?: boolean;
+    withHudPanel?: boolean;
+    showSystemSearch?: boolean;
+    showFpsStats?: boolean;
+    systemCategoryFilterMatchAny?: boolean;
+}
+
+export interface ED3DMapCategories {
+    [key: string]: {
+        [key: string]: SystemCategory;
     };
-    hideFilteredSystems: boolean;
-    withOptionsPanel: boolean;
-    withHudPanel: boolean;
-    showSystemSearch: boolean;
 }
 
 interface SystemCategory {

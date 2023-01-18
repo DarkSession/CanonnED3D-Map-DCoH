@@ -5,6 +5,8 @@ export class System {
     public readonly x: number;
     public readonly y: number;
     public readonly z: number;
+    public categories: string[] | null = null;
+    public description: string;
     public children: Object3D[] = [];
     public permanent = false;
     public systemPoint: SystemPoint | null = null;
@@ -15,8 +17,11 @@ export class System {
     ) {
         this.x = configuration.coordinates.x;
         this.y = configuration.coordinates.y;
-        this.z = -configuration.coordinates.z; //-- Revert Z coord
-
+        this.z = -configuration.coordinates.z; // Revert Z coord
+        this.description = configuration.description ?? "";
+        if (configuration.categories) {
+            this.categories = configuration.categories;
+        }
         this.ED3DMap.addSystem(this);
     }
 
